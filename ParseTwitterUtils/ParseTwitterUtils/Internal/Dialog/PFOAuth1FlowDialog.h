@@ -9,6 +9,7 @@
 
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
+#import <WebKit/WebKit.h>
 
 @class PFOAuth1FlowDialog;
 
@@ -66,7 +67,7 @@ typedef void (^PFOAuth1FlowDialogCompletion)(BOOL succeeded, NSURL *url, NSError
 
 @end
 
-@interface PFOAuth1FlowDialog : UIView <UIWebViewDelegate, PFOAuth1FlowDialogInterface> {
+@interface PFOAuth1FlowDialog : UIView <WKNavigationDelegate, PFOAuth1FlowDialogInterface> {
 @public
     // Ensures that UI elements behind the dialog are disabled.
     UIView *_modalBackgroundView;
@@ -76,7 +77,7 @@ typedef void (^PFOAuth1FlowDialogCompletion)(BOOL succeeded, NSURL *url, NSError
 
     UILabel *_titleLabel;
     UIButton *_closeButton;
-    UIWebView *_webView;
+    WKWebView *_webView;
     UIActivityIndicatorView *_activityIndicator;
 
     UIInterfaceOrientation _orientation;
