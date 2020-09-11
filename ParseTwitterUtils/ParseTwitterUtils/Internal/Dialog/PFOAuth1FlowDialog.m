@@ -8,7 +8,7 @@
  */
 
 #import "PFOAuth1FlowDialog.h"
-
+#import <WebKit/WebKit.h>
 #import <Parse/PFNetworkActivityIndicatorManager.h>
 
 @implementation PFOAuth1FlowDialog
@@ -203,9 +203,8 @@ static CGFloat PFTFloatRound(CGFloat value, NSRoundingMode mode) {
         _titleLabel.textColor = [UIColor whiteColor];
         _titleLabel.font = [UIFont boldSystemFontOfSize:titleLabelFontSize];
         [self addSubview:_titleLabel];
-        
-        WKWebViewConfiguration* webviewConfiguration = [[WKWebViewConfiguration alloc] init];
-        _webView = [[WKWebView alloc] initWithFrame:CGRectZero configuration:webviewConfiguration];
+
+        _webView = [[WKWebView alloc] initWithFrame:CGRectZero];
         _webView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         _webView.navigationDelegate = self;
         [self addSubview:_webView];
@@ -409,78 +408,47 @@ static CGFloat PFTFloatRound(CGFloat value, NSRoundingMode mode) {
 }
 
 #pragma mark -
-#pragma mark WKNavigationDelegate
+#pragma mark WKWebViewNavigationDelegate
 
-- (void)webView:(WKWebView *)webView
-decidePolicyForNavigationAction:(WKNavigationAction *)navigationAction
-decisionHandler:(void (^)(WKNavigationActionPolicy))decisionHandler
-{
-	NSURLRequest *request = navigationAction.request;
-    NSURL *url = request.URL;
-
-    if ([url.absoluteString hasPrefix:self.redirectURLPrefix]) {
+- (void)webView:(WKWebView *)webView decidePolicyForNavigationAction:(WKNavigationAction *)navigationAction decisionHandler:(void (^)(WKNavigationActionPolicy))decisionHandler {
+    NSURL *url = navigationAction.request.URL;
+    BOOL hasPrefix = [url.absoluteString hasPrefix:self.redirectURLPrefix];
+    if (hasPrefix) {
         [self _dismissWithSuccess:YES url:url error:nil];
-		decisionHandler( WKNavigationActionPolicyCancel );
+        decisionHandler(WKNavigationActionPolicyCancel);
         return;
-    } else if ([_loadingURL isEqual:url]) {
-		decisionHandler( WKNavigationActionPolicyAllow );
-        return;
-    } else if (navigationAction.navigationType == WKNavigationTypeLinkActivated) {
-        if ([self.dataSource dialog:self shouldOpenURLInExternalBrowser:url]) {
-            [[UIApplication sharedApplication] openURL:url];
-            // TODO: Should we not call the decisionHandler with WKNavigationActionPolicyCancel
-            // here to prevent it from attempting to load this URL?
-        }
-        else
-        {
-            decisionHandler( WKNavigationActionPolicyAllow );
-            return;
-        }
+    } else if (navigationAction.navigationType == UIWebViewNavigationTypeLinkClicked && [self.dataSource dialog:self shouldOpenURLInExternalBrowser:url]) {
+        [[UIApplication sharedApplication] openURL:url];
+    } else {
+        decisionHandler(WKNavigationActionPolicyAllow);
     }
-
-    decisionHandler( WKNavigationActionPolicyAllow );
 }
 
-- (void)webView:(WKWebView *)webView didCommitNavigation:(null_unspecified WKNavigation *)navigation {
+
+
+- (void)webView:(WKWebView *)webView didStartProvisionalNavigation:(WKNavigation *)navigation {
     [[PFNetworkActivityIndicatorManager sharedManager] incrementActivityCount];
 }
 
-- (void)webView:(WKWebView *)webView didFinishNavigation:(null_unspecified WKNavigation *)navigation {
+- (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
     [[PFNetworkActivityIndicatorManager sharedManager] decrementActivityCount];
 
     [_activityIndicator stopAnimating];
-    
-    [webView evaluateJavaScript:@"document.title" completionHandler:^(id jsonString, NSError* error) {
-        if (error != nil) {
-            return;
-        }
-    
-        if (jsonString == nil) {
-            return;
-        }
-
-        self.title = jsonString;
+    [_webView evaluateJavaScript:@"document.title" completionHandler:^(id _Nullable string, NSError * _Nullable error) {
+        self.title = (NSString *) string;
+        
     }];
+    
 }
 
-- (void)webView:(WKWebView *)webView didFailNavigation:(null_unspecified WKNavigation *)navigation withError:(NSError *)error {
+- (void)webView:(WKWebView *)webView didFailNavigation:(WKNavigation *)navigation withError:(NSError *)error {
     [[PFNetworkActivityIndicatorManager sharedManager] decrementActivityCount];
-    
+
     // 102 == WebKitErrorFrameLoadInterruptedByPolicyChange
     if (!([error.domain isEqualToString:@"WebKitErrorDomain"] && error.code == 102)) {
         [self _dismissWithSuccess:NO url:nil error:error];
     }
 }
-
-- (void)webView:(WKWebView *)webView didFailProvisionalNavigation:(null_unspecified WKNavigation *)navigation withError:(NSError *)error {
-    [[PFNetworkActivityIndicatorManager sharedManager] decrementActivityCount];
-    
-    // 102 == WebKitErrorFrameLoadInterruptedByPolicyChange
-    if (!([error.domain isEqualToString:@"WebKitErrorDomain"] && error.code == 102)) {
-        [self _dismissWithSuccess:NO url:nil error:error];
-    }
-}
-
 
 #pragma mark -
 #pragma mark Observers

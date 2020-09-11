@@ -10,7 +10,6 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <WebKit/WebKit.h>
-
 @class PFOAuth1FlowDialog;
 
 @protocol PFOAuth1FlowDialogDataSource <NSObject>
